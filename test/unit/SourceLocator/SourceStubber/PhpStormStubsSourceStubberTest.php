@@ -9,6 +9,8 @@ use ReflectionClass as CoreReflectionClass;
 use ReflectionFunction as CoreReflectionFunction;
 use ReflectionMethod as CoreReflectionMethod;
 use ReflectionParameter as CoreReflectionParameter;
+use ReflectionNamedType as CoreReflectionNamedType;
+use ReflectionUnionType as CoreReflectionUnionType;
 use Roave\BetterReflection\Reflection\ReflectionClass;
 use Roave\BetterReflection\Reflection\ReflectionConstant;
 use Roave\BetterReflection\Reflection\ReflectionMethod;
@@ -227,12 +229,20 @@ class PhpStormStubsSourceStubberTest extends TestCase
         self::assertSame($original->getName(), $stubbed->getName(), $parameterName);
         // Inconsistencies
         if (! in_array($parameterName, ['SplFileObject#fputcsv.fields', 'SplFixedArray#fromArray.array'], true)) {
-            self::assertSame($original->isArray(), $stubbed->isArray(), $parameterName);
+            $originalType = $original->getType();
+
+            if ($originalType instanceof CoreReflectionNamedType) {
+                self::assertSame($originalType->getName() === 'array', $stubbed->isArray(), $parameterName);
+            }
         }
 
         // Bugs in PHP: https://3v4l.org/RjCDr
         if (! in_array($parameterName, ['Closure#fromCallable.callable', 'CallbackFilterIterator#__construct.callback'], true)) {
-            self::assertSame($original->isCallable(), $stubbed->isCallable(), $parameterName);
+            $originalType = $original->getType();
+
+            if ($originalType instanceof CoreReflectionNamedType) {
+                self::assertSame($originalType->getName() === 'callable', $stubbed->isCallable(), $parameterName);
+            }
         }
 
         self::assertSame($original->canBePassedByValue(), $stubbed->canBePassedByValue(), $parameterName);
@@ -251,25 +261,31 @@ class PhpStormStubsSourceStubberTest extends TestCase
         self::assertSame($original->isPassedByReference(), $stubbed->isPassedByReference(), $parameterName);
         self::assertSame($original->isVariadic(), $stubbed->isVariadic(), $parameterName);
 
-        $class = $original->getClass();
-        if ($class) {
-            // Not possible to write "RecursiveIterator|IteratorAggregate" in PHP code in JetBrains/phpstorm-stubs
-            if ($parameterName !== 'RecursiveTreeIterator#__construct.iterator') {
-                $stubbedClass = $stubbed->getClass();
+        $originalReflectionType  = $original->getType();
+        $originalReflectionTypes = $originalReflectionType instanceof CoreReflectionUnionType ? $originalReflectionType->getTypes() : [$originalReflectionType];
 
-                self::assertInstanceOf(ReflectionClass::class, $stubbedClass, $parameterName);
-                self::assertSame($class->getName(), $stubbedClass->getName(), $parameterName);
-            }
-        } else {
-            // Bugs in PHP
-            if (
-                ! in_array($parameterName, [
-                    'Error#__construct.previous',
-                    'Exception#__construct.previous',
-                    'Closure#bind.closure',
-                ], true)
-            ) {
-                self::assertNull($stubbed->getClass(), $parameterName);
+        foreach ($originalReflectionTypes as $reflectionType) {
+            if ($reflectionType !== null && ! $reflectionType->isBuiltin()) {
+                $class = new CoreReflectionClass($reflectionType->getName());
+
+                // Not possible to write "RecursiveIterator|IteratorAggregate" in PHP code in JetBrains/phpstorm-stubs
+                if ($parameterName !== 'RecursiveTreeIterator#__construct.iterator') {
+                    $stubbedClass = $stubbed->getClass();
+
+                    self::assertInstanceOf(ReflectionClass::class, $stubbedClass, $parameterName);
+                    self::assertSame($class->getName(), $stubbedClass->getName(), $parameterName);
+                }
+            } else {
+                // Bugs in PHP
+                if (
+                    ! in_array($parameterName, [
+                        'Error#__construct.previous',
+                        'Exception#__construct.previous',
+                        'Closure#bind.closure',
+                    ], true)
+                ) {
+                    self::assertNull($stubbed->getClass(), $parameterName);
+                }
             }
         }
     }
@@ -393,7 +409,11 @@ class PhpStormStubsSourceStubberTest extends TestCase
 
             // Bugs in PHP
             if (! in_array($parameterName, ['preg_replace_callback.callback', 'header_register_callback.callback'], true)) {
-                self::assertSame($originalReflectionParameter->isCallable(), $stubbedReflectionParameter->isCallable(), $parameterName);
+                $originalReflectionParameterType = $originalReflectionParameter->getType();
+
+                if ($originalReflectionParameterType instanceof CoreReflectionNamedType) {
+                    self::assertSame($originalReflectionParameter->getType()->getName() === 'callable', $stubbedReflectionParameter->isCallable(), $parameterName);
+                }
             }
 
             // Needs fixes in JetBrains/phpstorm-stubs
@@ -401,22 +421,30 @@ class PhpStormStubsSourceStubberTest extends TestCase
                 self::assertSame($originalReflectionParameter->isVariadic(), $stubbedReflectionParameter->isVariadic(), $parameterName);
             }
 
-            $class = $originalReflectionParameter->getClass();
-            if ($class) {
+            $originalReflectionType  = $originalReflectionParameter->getType();
+            $originalReflectionTypes = $originalReflectionType instanceof CoreReflectionUnionType ? $originalReflectionType->getTypes() : [$originalReflectionType];
+
+            foreach ($originalReflectionTypes as $reflectionType) {
+                if ($reflectionType === null || $reflectionType->isBuiltin()) {
+                    continue;
+                }
+
+                $class = new CoreReflectionClass($reflectionType->getName());
+
                 // Needs fixes in JetBrains/phpstorm-stubs
                 if (
-                    ! in_array($parameterName, [
+                    in_array($parameterName, [
                         'iterator_to_array.iterator',
                         'iterator_count.iterator',
                         'iterator_apply.iterator',
                     ], true)
                 ) {
-                    $stubbedClass = $stubbedReflectionParameter->getClass();
-                    self::assertInstanceOf(ReflectionClass::class, $stubbedClass, $parameterName);
-                    self::assertSame($class->getName(), $stubbedClass->getName(), $parameterName);
+                    continue;
                 }
-            } else {
-                self::assertNull($originalReflectionParameter->getClass(), $parameterName);
+
+                $stubbedClass = $stubbedReflectionParameter->getClass();
+                self::assertInstanceOf(ReflectionClass::class, $stubbedClass, $parameterName);
+                self::assertSame($class->getName(), $stubbedClass->getName(), $parameterName);
             }
         }
     }
