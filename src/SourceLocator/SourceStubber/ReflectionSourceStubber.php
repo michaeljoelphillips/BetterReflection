@@ -34,7 +34,9 @@ use ReflectionClassConstant;
 use ReflectionFunction as CoreReflectionFunction;
 use ReflectionFunctionAbstract as CoreReflectionFunctionAbstract;
 use ReflectionMethod as CoreReflectionMethod;
+use ReflectionType as CoreReflectionType;
 use ReflectionNamedType as CoreReflectionNamedType;
+use ReflectionUnionType as CoreReflectionUnionType;
 use ReflectionParameter;
 use ReflectionProperty as CoreReflectionProperty;
 use Reflector as CoreReflector;
@@ -463,7 +465,7 @@ final class ReflectionSourceStubber implements SourceStubber
         }
 
         $parameterType = $parameterReflection->getType();
-        assert($parameterType instanceof CoreReflectionNamedType || $parameterType === null);
+        assert($parameterType instanceof CoreReflectionNamedType || $parameterType instanceof CoreReflectionUnionType || $parameterType === null);
 
         if ($parameterType === null) {
             return;
@@ -489,8 +491,12 @@ final class ReflectionSourceStubber implements SourceStubber
     /**
      * @return Name|FullyQualified|NullableType
      */
-    private function formatType(CoreReflectionNamedType $type): NodeAbstract
+    private function formatType(CoreReflectionType $type): NodeAbstract
     {
+        if ($type instanceof CoreReflectionUnionType) {
+            return new FullyQualified('mixed');
+        }
+
         $name     = $type->getName();
         $nameNode = $type->isBuiltin() || in_array($name, ['self', 'parent', 'static'], true) ? new Name($name) : new FullyQualified($name);
 

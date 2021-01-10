@@ -11,6 +11,7 @@ use ReflectionClass as CoreReflectionClass;
 use ReflectionException;
 use ReflectionMethod as CoreReflectionMethod;
 use ReflectionParameter as CoreReflectionParameter;
+use ReflectionUnionType as CoreReflectionUnionType;
 use Roave\BetterReflection\Reflection\ReflectionClass;
 use Roave\BetterReflection\Reflection\ReflectionMethod;
 use Roave\BetterReflection\Reflection\ReflectionParameter;
@@ -307,10 +308,15 @@ class ReflectionSourceStubberTest extends TestCase
             . '.' . $original->getName();
 
         self::assertSame($original->getName(), $stubbed->getName(), $parameterName);
-        self::assertSame($original->isArray(), $stubbed->isArray(), $parameterName);
-        if (! ($original->getDeclaringClass()->getName() === Closure::class && $originalMethod->getName() === 'fromCallable')) {
-            // Bug in PHP: https://3v4l.org/EeHXS
-            self::assertSame($original->isCallable(), $stubbed->isCallable(), $parameterName);
+
+        $originalType = $original->getType();
+
+        if ($originalType !== null && $originalType instanceof CoreReflectionUnionType === false) {
+            self::assertSame($original->getType()->getName() === 'array', $stubbed->isArray(), $parameterName);
+            if (! ($original->getDeclaringClass()->getName() === Closure::class && $originalMethod->getName() === 'fromCallable')) {
+                // Bug in PHP: https://3v4l.org/EeHXS
+                self::assertSame($original->getType()->getName() === 'callable', $stubbed->isCallable(), $parameterName);
+            }
         }
 
         //self::assertSame($original->allowsNull(), $stubbed->allowsNull()); @TODO WTF?
@@ -330,12 +336,12 @@ class ReflectionSourceStubberTest extends TestCase
         self::assertSame($original->isPassedByReference(), $stubbed->isPassedByReference(), $parameterName);
         self::assertSame($original->isVariadic(), $stubbed->isVariadic(), $parameterName);
 
-        $class = $original->getClass();
-        if ($class) {
+        $originalType = $original->getType();
+        if ($originalType !== null && $originalType instanceof CoreReflectionUnionType === false && $originalType->isBuiltin() === false) {
             $stubbedClass = $stubbed->getClass();
 
             self::assertInstanceOf(ReflectionClass::class, $stubbedClass, $parameterName);
-            self::assertSame($class->getName(), $stubbedClass->getName(), $parameterName);
+            self::assertSame($originalType->getName(), $stubbedClass->getName(), $parameterName);
         } else {
             self::assertNull($stubbed->getClass(), $parameterName);
         }
