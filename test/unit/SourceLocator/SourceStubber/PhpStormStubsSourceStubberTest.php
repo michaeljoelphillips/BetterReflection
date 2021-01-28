@@ -272,6 +272,15 @@ class PhpStormStubsSourceStubberTest extends TestCase
                 if ($parameterName !== 'RecursiveTreeIterator#__construct.iterator') {
                     $stubbedClass = $stubbed->getClass();
 
+                    /* var_dump($stubbedClass === null); */
+
+                    if ($stubbedClass === null) {
+                        /* var_dump($parameterName); */
+                        /* die; */
+                        /* var_dump($stubbed->getName()); */
+                        /* var_dump($reflectionType->isBuiltin()); die; */
+                    }
+
                     self::assertInstanceOf(ReflectionClass::class, $stubbedClass, $parameterName);
                     self::assertSame($class->getName(), $stubbedClass->getName(), $parameterName);
                 }

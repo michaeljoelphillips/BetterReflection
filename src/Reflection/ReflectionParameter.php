@@ -487,7 +487,11 @@ class ReflectionParameter
             ));
         }
 
-        return $this->reflector->reflect($className);
+        $reflection = $this->reflector->reflect($className);
+
+        var_dump($reflection->getName());
+
+        return $reflection;
     }
 
     private function getClassName(): ?string
